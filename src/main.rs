@@ -1,113 +1,75 @@
+use std::io;
+use std::io::Write;
 use bitflags::bitflags;
 
 bitflags! {
     #[derive(Default, Clone)]
     struct PermissaoFlags: u8 {
-        const LEITURA = 0b100; // 4
-        const ESCRITA = 0b010; // 2
-        const EXECUCAO = 0b001; // 1
+        const LEITURA = 0b100;
+        const ESCRITA = 0b010;
+        const EXECUCAO = 0b001;
     }
 }
 
 #[derive(Clone)]
-struct Arquivo { //Estrutura de Arquivo
+struct Arquivo {
     nome: String,
     tamanho: u64,
-    permissoes: Permissao, 
-    usuario: Usuario,
-    grupo: Grupo,
-}
-
-#[derive(Clone)]
-struct Permissao { //Estrutura de Permissão
     permissoes: PermissaoFlags,
     usuario: Usuario,
-    grupo: String,
-}
-
-#[derive(Clone)]
-struct Diretorio { //Estrutura de Diretório
-    nome: String,
-    arquivo: Vec<Arquivo>, 
-    permissoes: Permissao,
-    dono: Usuario,
-}
-
-#[derive(Clone)]
-struct Usuario { //Estrutura de Usuário
-    nome: String,
-    uid: u16,
     grupo: Grupo,
 }
 
 #[derive(Clone)]
-struct Grupo { //Estrutura de Grupo
+struct Usuario {
+    nome: String,
+    uid: u16,
+}
+
+#[derive(Clone)]
+struct Grupo {
     nome: String,
     gid: u16,
     membros: Vec<Usuario>,
 }
 
-//Implementação dos métodos das estruturas
-//Implementação de Arquivo
 impl Arquivo {
-    //1º Método new
-    fn new(nome: String, tamanho: u64, uid: u16, gid: u16) -> Arquivo {
-        let usuario = Usuario{
-            nome: format!("usuario{}", uid), //formando o nome do usuário UID da STRUCT
-            uid,
-            grupo: Grupo{
-                nome: format!("grupo{}", gid), //formando o nome do grupo GID da STRUCT
-                gid,
-                membros: vec![], //usuário é relacionado ao grupo, por isso que tem um vetor de membros.
-            },
-        };  //Por fim, o arquivo é criado com o nome, tamanho, permissões, usuário e grupo.
-        let grupo = usuario.grupo.clone(); //clone para não perder a referência
-        //Graças ao [devire(Clone)] dentro do cargo.toml, podemos clonar a referência do usuário para o grupo.
+    fn new(nome: String, tamanho: u64, usuario: Usuario, grupo: Grupo) -> Arquivo {
         Arquivo {
             nome,
             tamanho,
-            permissoes: Permissao::new(PermissaoFlags::LEITURA | PermissaoFlags::ESCRITA), 
-            usuario, // uid
-            grupo, // gid
+            permissoes: PermissaoFlags::LEITURA | PermissaoFlags::ESCRITA,
+            usuario,
+            grupo,
         }
-    }   
-
-    //2º Método alterar_permissao
-    fn alterar_permissao(&mut self, nova_permissao: Permissao) { 
-        self.permissoes = nova_permissao;
     }
 
-    //3º Método stat autorreferencial -> &self
+    fn alterar_permissao(&mut self, leitura: bool, escrita: bool, execucao: bool) {
+        let mut novas_permissoes = PermissaoFlags::empty();
+        if leitura {
+            novas_permissoes |= PermissaoFlags::LEITURA;
+        }
+        if escrita {
+            novas_permissoes |= PermissaoFlags::ESCRITA;
+        }
+        if execucao {
+            novas_permissoes |= PermissaoFlags::EXECUCAO;
+        }
+        self.permissoes = novas_permissoes;
+    }
+
     fn stat(&self) -> String {
-        let arquivo = self.nome.clone();
-        let tamanho = self.tamanho;
-        let permissoes = self.permissoes.rwx();
-        let usuario = self.usuario.nome.clone();
-        let grupo = self.grupo.nome.clone();
-        format!("{} {} {} {} {}", arquivo, tamanho, permissoes, usuario, grupo)
-    }
-}
-
-
-impl Permissao {
-    //1º Método new para criar uma nova permissão
-    fn new(permissoes: PermissaoFlags) -> Permissao {
-        Permissao {
-            permissoes,
-            usuario: Usuario {
-                nome: "".to_string(),
-                uid: 0,
-                grupo: Grupo {
-                    nome: "".to_string(),
-                    gid: 0,
-                    membros: vec![],
-                },
-            },
-            grupo: String::new(),
-        }
+        format!(
+            "{} {} {} {} {}",
+            self.nome,
+            self.tamanho,
+            self.permissoes_rwx(),
+            self.usuario.nome,
+            self.grupo.nome
+        )
     }
 
-    fn rwx(&self) -> String { // Método para retornar permissões em formato rwx
+    fn permissoes_rwx(&self) -> String {
         format!(
             "{}{}{}",
             if self.permissoes.contains(PermissaoFlags::LEITURA) { "r" } else { "-" },
@@ -115,156 +77,201 @@ impl Permissao {
             if self.permissoes.contains(PermissaoFlags::EXECUCAO) { "x" } else { "-" },
         )
     }
-
-    //2º Método octal autorreferente -> &self
-    fn octal(&self) -> u8 {
-        self.permissoes.bits()
-    }
-
-    // Método para verificar se tem permissão de leitura
-    fn tem_leitura(&self) -> bool {
-        self.permissoes.contains(PermissaoFlags::LEITURA)
-    }
-
-    // Método para verificar se tem permissão de escrita
-    fn tem_escrita(&self) -> bool {
-        self.permissoes.contains(PermissaoFlags::ESCRITA)
-    }
-
-    // Método para verificar se tem permissão de execução
-    fn tem_execucao(&self) -> bool {
-        self.permissoes.contains(PermissaoFlags::EXECUCAO)
-    }
-}   
-
-
-
-impl Diretorio {
-    //1º Método new
-    fn new(nome: String, permissoes: Permissao, dono: Usuario, arquivo: Arquivo) -> Diretorio {
-        Diretorio {
-            nome,
-            permissoes,
-            dono,
-            arquivo: vec![arquivo],
-        }
-    }
-
-    //2º Método adicionar_arquivo
-    fn adicionar_arquivo(&mut self, arquivo: Arquivo) {
-        self.arquivo.push(arquivo);
-    }
-
-    //3º Método remover_arquivo
-    fn remover_arquivo(&mut self, arquivo: Arquivo) {
-        self.arquivo.retain(|a| a.nome != arquivo.nome);
-    }
-
-    //4º Método listar_arquivos
-    fn listar_arquivos(&self) -> Vec<String> {
-        self.arquivo.iter().map(|a| a.nome.clone()).collect()
-    }
 }
 
 impl Usuario {
-    //1º Método new
-    fn new(nome: String, uid: u16, grupo: Grupo) -> Usuario {
-        Usuario {
-            nome,
-            uid,
-            grupo,
-        }
-    }
-
-    //2º Método adiciona_grupo
-    fn adiciona_grupo(&mut self, grupo: Grupo) {
-        self.grupo = grupo;
-    }
-
-    //3º Método remove_grupo
-    fn remove_grupo(&mut self) {
-        self.grupo = Grupo::new("".to_string(), 0, vec![]);
-    }
-
-    //4º Método listar_grupos
-    fn listar_grupos(&self) -> Vec<String> {
-        self.grupo.membros.iter().map(|g| g.nome.clone()).collect()
+    fn new(nome: String, uid: u16) -> Usuario {
+        Usuario { nome, uid }
     }
 }
 
 impl Grupo {
-    //1º Método new
-    fn new(nome: String, gid: u16, membros: Vec<Usuario>) -> Grupo {
+    fn new(nome: String, gid: u16) -> Grupo {
         Grupo {
             nome,
             gid,
-            membros,
+            membros: Vec::new(),
         }
     }
-
-    //2º Método adicionar_membro
-    fn adicionar_membro(&mut self, usuario: Usuario) {
-        self.membros.push(usuario);
-    }
-
-    //3º Método remover_membro
-    fn remover_membro(&mut self, usuario: Usuario) {
-        self.membros.retain(|u| u.nome != usuario.nome);
-    }
-
-    //4º Método listar_membros
-    fn listar_membros(&self) -> Vec<String> {
-        self.membros.iter().map(|u| u.nome.clone()).collect()
-    }
 }
-
-// fn main(){
-//     let arquivo = Arquivo::new("meuarquivo.txt".to_string(), 1024, 1, 1);
-//     println!("{}", arquivo.stat());
-// }
-
 
 fn main() {
-    // Criar usuários e grupos
-    let grupo = Grupo::new("grupo1".to_string(), 1, vec![]);
-    let usuario = Usuario::new("usuario1".to_string(), 1, grupo.clone());
+    let mut arquivos = Vec::new();
+    let mut usuarios: Vec<Usuario> = Vec::new();
+    let mut grupos: Vec<Grupo> = Vec::new();
 
-    // Criar um arquivo
-    let arquivo = Arquivo::new("meuarquivo.txt".to_string(), 1024, 1, 1);
-    println!("Arquivo criado: {}", arquivo.stat());
+    loop {
+        println!("\n--- Menu de Gerenciamento do Sistema de Arquivos ---");
 
-    // Alterar permissões do arquivo
-    let nova_permissao = Permissao::new(PermissaoFlags::LEITURA | PermissaoFlags::EXECUCAO);
-    arquivo.alterar_permissao(nova_permissao);
-    println!("Arquivo com nova permissão: {}", arquivo.stat());
+        // Arquivo
+        println!("1. Criar arquivo");
+        println!("2. Editar permissões do arquivo");
+        println!("3. Listar arquivos");
+        println!("4. Apagar arquivo");
 
-    // Verificar permissões no formato rwx
-    let permissoes = arquivo.permissoes.rwx();
-    println!("Permissões do arquivo em formato rwx: {}", permissoes);
+        // Usuário
+        println!("9. Criar usuário");
+        println!("11. Listar usuários");
 
-    // Verificar permissões no formato octal
-    let permissoes_octal = arquivo.permissoes.octal();
-    println!("Permissões do arquivo em formato octal: {}", permissoes_octal);
+        // Grupo
+        println!("13. Criar grupo");
+        println!("15. Listar grupos");
 
-    // Criar um diretório
-    let diretorio = Diretorio::new("meudiretorio".to_string(), Permissao::new(PermissaoFlags::LEITURA), usuario.clone(), arquivo);
-    println!("Diretório criado com arquivos: {:?}", diretorio.listar_arquivos());
+        println!("0. Sair");
 
-    // Adicionar e remover arquivos do diretório
-    let novo_arquivo = Arquivo::new("outroarquivo.txt".to_string(), 2048, 2, 2);
-    let mut diretorio_mut = diretorio;
-    diretorio_mut.adicionar_arquivo(novo_arquivo);
-    println!("Arquivos no diretório após adicionar: {:?}", diretorio_mut.listar_arquivos());
+        print!("Escolha uma opção: ");
+        io::stdout().flush().unwrap();
 
-    diretorio_mut.remover_arquivo(Arquivo::new("outroarquivo.txt".to_string(), 2048, 2, 2));
-    println!("Arquivos no diretório após remover: {:?}", diretorio_mut.listar_arquivos());
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).expect("Falha ao ler a entrada");
 
-    // Testar adicionar e remover usuários de grupo
-    let mut grupo_mut = grupo;
-    grupo_mut.adicionar_membro(usuario.clone());
-    println!("Membros do grupo após adicionar: {:?}", grupo_mut.listar_membros());
+        match input.trim() {
+            "1" => {
+                // Criar arquivo
+                let mut nome = String::new();
+                print!("Nome do arquivo: ");
+                io::stdout().flush().unwrap();
+                io::stdin().read_line(&mut nome).expect("Falha ao ler a entrada");
+                let nome = nome.trim().to_string();
 
-    grupo_mut.remover_membro(usuario);
-    println!("Membros do grupo após remover: {:?}", grupo_mut.listar_membros());
+                let mut tamanho = String::new();
+                print!("Tamanho do arquivo: ");
+                io::stdout().flush().unwrap();
+                io::stdin().read_line(&mut tamanho).expect("Falha ao ler a entrada");
+                let tamanho = tamanho.trim().parse::<u64>().unwrap();
+
+                if usuarios.is_empty() || grupos.is_empty() {
+                    println!("Crie um usuário e um grupo antes de criar um arquivo.");
+                    continue;
+                }
+                
+                let usuario = usuarios[0].clone(); // Apenas como exemplo, seleciona o primeiro usuário
+                let grupo = grupos[0].clone(); // Apenas como exemplo, seleciona o primeiro grupo
+                
+                let arquivo = Arquivo::new(nome, tamanho, usuario, grupo);
+                println!("Arquivo criado com sucesso: {}", arquivo.stat());
+
+                arquivos.push(arquivo);
+            }
+            "2" => {
+                // Editar permissões do arquivo
+                if arquivos.is_empty() {
+                    println!("Nenhum arquivo para editar.");
+                    continue;
+                }
+
+                println!("Arquivos disponíveis:");
+                for (i, arquivo) in arquivos.iter().enumerate() {
+                    println!("{} - {}", i + 1, arquivo.stat());
+                }
+
+                let mut indice = String::new();
+                print!("Digite o número do arquivo que deseja editar: ");
+                io::stdout().flush().unwrap();
+                io::stdin().read_line(&mut indice).expect("Falha ao ler a entrada");
+                let indice = indice.trim().parse::<usize>().unwrap() - 1;
+
+                if indice >= arquivos.len() {
+                    println!("Índice inválido.");
+                    continue;
+                }
+
+                let mut leitura = String::new();
+                print!("Permissão de leitura (s/n): ");
+                io::stdout().flush().unwrap();
+                io::stdin().read_line(&mut leitura).expect("Falha ao ler a entrada");
+                let leitura = leitura.trim() == "s";
+
+                let mut escrita = String::new();
+                print!("Permissão de escrita (s/n): ");
+                io::stdout().flush().unwrap();
+                io::stdin().read_line(&mut escrita).expect("Falha ao ler a entrada");
+                let escrita = escrita.trim() == "s";
+
+                let mut execucao = String::new();
+                print!("Permissão de execução (s/n): ");
+                io::stdout().flush().unwrap();
+                io::stdin().read_line(&mut execucao).expect("Falha ao ler a entrada");
+                let execucao = execucao.trim() == "s";
+
+                arquivos[indice].alterar_permissao(leitura, escrita, execucao);
+                println!("Permissões alteradas com sucesso!");
+            }
+            "3" => {
+                // Listar arquivos
+                if arquivos.is_empty() {
+                    println!("Nenhum arquivo encontrado.");
+                } else {
+                    for arquivo in &arquivos {
+                        println!("{}", arquivo.stat());
+                    }
+                }
+            }
+            "4" => {
+                // Apagar arquivo
+                if arquivos.is_empty() {
+                    println!("Nenhum arquivo para apagar.");
+                    continue;
+                }
+
+                let mut indice = String::new();
+                print!("Digite o número do arquivo que deseja apagar: ");
+                io::stdout().flush().unwrap();
+                io::stdin().read_line(&mut indice).expect("Falha ao ler a entrada");
+                let indice = indice.trim().parse::<usize>().unwrap() - 1;
+
+                if indice < arquivos.len() {
+                    arquivos.remove(indice);
+                    println!("Arquivo apagado com sucesso.");
+                } else {
+                    println!("Índice inválido.");
+                }
+            }
+            "9" => {
+                // Criar usuário
+                let mut nome = String::new();
+                print!("Nome do usuário: ");
+                io::stdout().flush().unwrap();
+                io::stdin().read_line(&mut nome).expect("Falha ao ler a entrada");
+                let usuario = Usuario::new(nome.trim().to_string(), usuarios.len() as u16);
+                usuarios.push(usuario);
+                println!("Usuário criado com sucesso.");
+            }
+            "11" => {
+                // Listar usuários
+                if usuarios.is_empty() {
+                    println!("Nenhum usuário encontrado.");
+                } else {
+                    for usuario in &usuarios {
+                        println!("{} (UID: {})", usuario.nome, usuario.uid);
+                    }
+                }
+            }
+            "13" => {
+                // Criar grupo
+                let mut nome = String::new();
+                print!("Nome do grupo: ");
+                io::stdout().flush().unwrap();
+                io::stdin().read_line(&mut nome).expect("Falha ao ler a entrada");
+                let grupo = Grupo::new(nome.trim().to_string(), grupos.len() as u16);
+                grupos.push(grupo);
+                println!("Grupo criado com sucesso.");
+            }
+            "15" => {
+                // Listar grupos
+                if grupos.is_empty() {
+                    println!("Nenhum grupo encontrado.");
+                } else {
+                    for grupo in &grupos {
+                        println!("{} (GID: {})", grupo.nome, grupo.gid);
+                    }
+                }
+            }
+            "0" => {
+                println!("Saindo do programa...");
+                break;
+            }
+            _ => println!("Opção inválida, tente novamente."),
+        }
+    }
 }
-
