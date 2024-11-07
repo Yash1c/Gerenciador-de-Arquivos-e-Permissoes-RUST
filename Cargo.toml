@@ -1,0 +1,7 @@
+[package]
+name = "trabalho_RA1_RA2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.bitflags]
+version = "2.6.0"
