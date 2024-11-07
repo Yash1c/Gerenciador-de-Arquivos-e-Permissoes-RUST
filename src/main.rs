@@ -93,6 +93,11 @@ impl Grupo {
             membros: Vec::new(),
         }
     }
+
+//Comecei a tentar criar, com uso da biblioteca hashlib, para usuarios e grupos.
+    fn cadastrar_usuario(&mut self, usuario: Usuario) {
+        self.membros.push(usuario);
+    }
 }
 
 fn main() {
@@ -110,12 +115,12 @@ fn main() {
         println!("4. Apagar arquivo");
 
         // Usuário
-        println!("9. Criar usuário");
-        println!("11. Listar usuários");
+        println!("5. Criar usuário");
+        println!("6. Listar usuários");
 
         // Grupo
-        println!("13. Criar grupo");
-        println!("15. Listar grupos");
+        println!("7. Criar grupo");
+        println!("8. Listar grupos");
 
         println!("0. Sair");
 
@@ -127,7 +132,7 @@ fn main() {
 
         match input.trim() {
             "1" => {
-                // Criar arquivo
+                
                 let mut nome = String::new();
                 print!("Nome do arquivo: ");
                 io::stdout().flush().unwrap();
@@ -145,8 +150,8 @@ fn main() {
                     continue;
                 }
                 
-                let usuario = usuarios[0].clone(); // Apenas como exemplo, seleciona o primeiro usuário
-                let grupo = grupos[0].clone(); // Apenas como exemplo, seleciona o primeiro grupo
+                let usuario = usuarios[0].clone(); 
+                let grupo = grupos[0].clone(); 
                 
                 let arquivo = Arquivo::new(nome, tamanho, usuario, grupo);
                 println!("Arquivo criado com sucesso: {}", arquivo.stat());
@@ -203,7 +208,7 @@ fn main() {
                     println!("Nenhum arquivo encontrado.");
                 } else {
                     for arquivo in &arquivos {
-                        println!("{}", arquivo.stat());
+                        println!("Arquivo: {}", arquivo.stat());
                     }
                 }
             }
@@ -227,7 +232,7 @@ fn main() {
                     println!("Índice inválido.");
                 }
             }
-            "9" => {
+            "5" => {
                 // Criar usuário
                 let mut nome = String::new();
                 print!("Nome do usuário: ");
@@ -237,17 +242,17 @@ fn main() {
                 usuarios.push(usuario);
                 println!("Usuário criado com sucesso.");
             }
-            "11" => {
+            "6" => {
                 // Listar usuários
                 if usuarios.is_empty() {
                     println!("Nenhum usuário encontrado.");
                 } else {
                     for usuario in &usuarios {
-                        println!("{} (UID: {})", usuario.nome, usuario.uid);
+                        println!("Usuários: {} (UID: {})", usuario.nome, usuario.uid);
                     }
                 }
             }
-            "13" => {
+            "7" => {
                 // Criar grupo
                 let mut nome = String::new();
                 print!("Nome do grupo: ");
@@ -257,13 +262,13 @@ fn main() {
                 grupos.push(grupo);
                 println!("Grupo criado com sucesso.");
             }
-            "15" => {
+            "8" => {
                 // Listar grupos
                 if grupos.is_empty() {
                     println!("Nenhum grupo encontrado.");
                 } else {
                     for grupo in &grupos {
-                        println!("{} (GID: {})", grupo.nome, grupo.gid);
+                        println!("Grupo: {} (GID: {})", grupo.nome, grupo.gid);
                     }
                 }
             }
