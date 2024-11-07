@@ -1,0 +1,2 @@
+# Gerenciador-de-Arquivos-e-Permissoes
+ Este projeto implementa um sistema simples de gerenciamento de arquivos, diretórios, permissões, grupos e usuários, seguindo os conceitos básicos de sistemas operacionais e controle de acesso. Ele foi desenvolvido para atender aos requisitos de uma atividade acadêmica, utilizando estruturas de dados em Rust, com foco no uso de autorreferências (self-referential structures).
